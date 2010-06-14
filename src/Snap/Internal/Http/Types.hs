@@ -181,7 +181,8 @@ data ProcessingState = ProcessingState
       -- character, and represents the path (relative to your
       -- component\/snaplet) you took to get to your handler.
     , psContextPath    :: !ByteString
-      -- | TODO some documentation here
+      -- | All parameters that are collected using variable syntax or other
+      -- mechanism from the request path 
     , psCollectedPathParams :: Params
     
     }
@@ -253,6 +254,7 @@ data Request = Request
       -- | Returns the HTTP query string for this 'Request'.
     , rqQueryString    :: !ByteString
 
+    , rqPath           :: !ByteString
       -- | Returns the 'Params' mapping for this 'Request'. \"Parameters\" are
       -- automatically decoded from the query string and @POST@ body and
       -- entered into this mapping.
