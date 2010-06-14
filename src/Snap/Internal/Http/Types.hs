@@ -166,7 +166,25 @@ type Params = Map ByteString [ByteString]
 
 data SomeEnumerator = SomeEnumerator (forall a . Enumerator a)
 
+------------------------------------------------------------------------------
+data ProcessingState = ProcessingState
+    {
+      -- | Handlers can (/will be; --ed/) be hung on a @URI@ \"entry point\";
+      -- this is called the \"context path\". If a handler is hung on the
+      -- context path @\"\/foo\/\"@, and you request @\"\/foo\/bar\"@, the value
+      -- of 'rqPathInfo' will be @\"bar\"@.
+     rqPathInfo       :: !ByteString
 
+      -- | The \"context path\" of the request; catenating 'rqContextPath', and
+      -- 'rqPathInfo' should get you back to the original 'rqURI'. The
+      -- 'rqContextPath' always begins and ends with a slash (@\"\/\"@)
+      -- character, and represents the path (relative to your
+      -- component\/snaplet) you took to get to your handler.
+    , rqContextPath    :: !ByteString
+
+    
+    }
+     
 ------------------------------------------------------------------------------
 -- | Contains all of the information about an incoming HTTP request.
 data Request = Request
@@ -227,20 +245,7 @@ data Request = Request
       -- note that until we introduce snaplets in v0.2, 'rqSnapletPath' will be
       -- \"\"
     , rqSnapletPath    :: !ByteString
-
-      -- | Handlers can (/will be; --ed/) be hung on a @URI@ \"entry point\";
-      -- this is called the \"context path\". If a handler is hung on the
-      -- context path @\"\/foo\/\"@, and you request @\"\/foo\/bar\"@, the value
-      -- of 'rqPathInfo' will be @\"bar\"@.
-    , rqPathInfo       :: !ByteString
-
-      -- | The \"context path\" of the request; catenating 'rqContextPath', and
-      -- 'rqPathInfo' should get you back to the original 'rqURI'. The
-      -- 'rqContextPath' always begins and ends with a slash (@\"\/\"@)
-      -- character, and represents the path (relative to your
-      -- component\/snaplet) you took to get to your handler.
-    , rqContextPath    :: !ByteString
-
+    
       -- | Returns the @URI@ requested by the client.
     , rqURI            :: !ByteString
 
@@ -271,8 +276,6 @@ instance Show Request where
                     , method
                     , version
                     , cookies
-                    , pathinfo
-                    , contextpath
                     , snapletpath
                     , uri
                     , params
@@ -306,8 +309,7 @@ instance Show Request where
                              , "      " ++ (show $ rqCookies r)
                              , "\n      ========================================"
                              ]
-      pathinfo      = concat [ "pathinfo: ", toStr $ rqPathInfo r ]
-      contextpath   = concat [ "contextpath: ", toStr $ rqContextPath r ]
+    
       snapletpath   = concat [ "snapletpath: ", toStr $ rqSnapletPath r ]
       uri           = concat [ "URI: ", toStr $ rqURI r ]
       params        = concat [ "params:\n"

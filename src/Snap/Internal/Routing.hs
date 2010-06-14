@@ -147,7 +147,7 @@ routeEarliestNC r n = case r of
 --
 route :: [(ByteString, Snap a)] -> Snap a
 route rts = do
-  p <- getRequest >>= return . rqPathInfo
+  p <- getProcessingState >>= return . rqPathInfo
   route' (return ()) ([], splitPath p) Map.empty rts'
   where
     rts' = mconcat (map pRoute rts)
@@ -160,10 +160,10 @@ route rts = do
 -- it is.
 routeLocal :: [(ByteString, Snap a)] -> Snap a
 routeLocal rts = do
-    req    <- getRequest
-    let ctx = rqContextPath req
-    let p   = rqPathInfo req
-    let md  = modifyRequest $ \r -> r {rqContextPath=ctx, rqPathInfo=p}
+    pstate    <- getProcessingState
+    let ctx = rqContextPath pstate
+    let p   = rqPathInfo pstate
+    let md  = modifyProcessingState $ \ps -> ps {rqContextPath=ctx, rqPathInfo=p}
 
     (route' md ([], splitPath p) Map.empty rts') <|> (md >> pass)
 
@@ -192,7 +192,7 @@ route' :: Snap ()
        -> Route a
        -> Snap a
 route' pre (ctx, _) params (Action action) =
-    localRequest (updateContextPath (B.length ctx') . updateParams)
+    localProcessing (updateContextPath (B.length ctx') . updateParams)
                  (pre >> action)
   where
     ctx' = B.intercalate (B.pack [c2w '/']) (reverse ctx)

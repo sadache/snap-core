@@ -10,6 +10,7 @@ import           Control.Applicative
 import           Control.Exception (throwIO, ErrorCall(..))
 import           Control.Monad.CatchIO
 import           Control.Monad.State.Strict
+import           Control.Monad.Reader
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -83,13 +84,13 @@ import           Snap.Internal.Http.Types
 
 ------------------------------------------------------------------------------
 newtype Snap a = Snap {
-      unSnap :: StateT SnapState (Iteratee IO) (Maybe (Either Response a))
+      unSnap ::ReaderT Request (StateT SnapState (Iteratee IO)) (Maybe (Either Response a))
 } deriving Typeable
 
 
 ------------------------------------------------------------------------------
 data SnapState = SnapState
-    { _snapRequest  :: Request
+    { _snapProcessingState  :: ProcessingState
     , _snapResponse :: Response
     , _snapLogError :: ByteString -> IO () }
 
@@ -154,7 +155,7 @@ instance Alternative Snap where
 
 ------------------------------------------------------------------------------
 liftIter :: Iteratee IO a -> Snap a
-liftIter i = Snap (lift i >>= return . Just . Right)
+liftIter i = Snap ((lift.lift) i >>= return . Just . Right)
 
 
 ------------------------------------------------------------------------------
@@ -240,16 +241,14 @@ method m action = do
 ------------------------------------------------------------------------------
 -- Appends n bytes of the path info to the context path with a
 -- trailing slash.
-updateContextPath :: Int -> Request -> Request
-updateContextPath n req | n > 0     = req { rqContextPath = ctx
-                                          , rqPathInfo    = pinfo }
-                        | otherwise = req
+updateContextPath :: Int -> ProcessingState -> ProcessingState
+updateContextPath n pstate | n > 0     = pstate { rqContextPath = ctx
+                                                , rqPathInfo    = pinfo }
+                        | otherwise = pstate
   where
-    ctx'  = S.take n (rqPathInfo req)
-    ctx   = S.concat [rqContextPath req, ctx', "/"]
-    pinfo = S.drop (n+1) (rqPathInfo req)
-
-
+    ctx'  = S.take n (rqPathInfo pstate)
+    ctx   = S.concat [rqContextPath pstate, ctx', "/"]
+    pinfo = S.drop (n+1) (rqPathInfo pstate)
 ------------------------------------------------------------------------------
 -- Runs a 'Snap' monad action only if the 'rqPathInfo' matches the given
 -- predicate.
@@ -258,9 +257,9 @@ pathWith :: (ByteString -> ByteString -> Bool)
          -> Snap a
          -> Snap a
 pathWith c p action = do
-    req <- getRequest
-    unless (c p (rqPathInfo req)) pass
-    localRequest (updateContextPath $ S.length p) action
+    pstate <- getProcessingState
+    unless (c p (rqPathInfo pstate)) pass
+    localProcessing (updateContextPath $ S.length p) action
 
 
 ------------------------------------------------------------------------------
@@ -309,6 +308,11 @@ sget = Snap $ liftM (Just . Right) get
 
 
 ------------------------------------------------------------------------------
+sask :: Snap Request
+sask = Snap $ liftM (Just . Right) ask 
+{-# INLINE sask #-}
+
+------------------------------------------------------------------------------
 -- | Local Snap monad version of 'modify'.
 smodify :: (SnapState -> SnapState) -> Snap ()
 smodify f = Snap $ modify f >> return (Just $ Right ())
@@ -318,10 +322,13 @@ smodify f = Snap $ modify f >> return (Just $ Right ())
 ------------------------------------------------------------------------------
 -- | Grabs the 'Request' object out of the 'Snap' monad.
 getRequest :: Snap Request
-getRequest = liftM _snapRequest sget
+getRequest = sask
 {-# INLINE getRequest #-}
 
-
+------------------------------------------------------------------------------
+getProcessingState :: Snap ProcessingState
+getProcessingState = liftM _snapProcessingState sget
+{-# INLINE getProcessingState #-}
 ------------------------------------------------------------------------------
 -- | Grabs the 'Response' object out of the 'Snap' monad.
 getResponse :: Snap Response
@@ -335,21 +342,29 @@ putResponse :: Response -> Snap ()
 putResponse r = smodify $ \ss -> ss { _snapResponse = r }
 {-# INLINE putResponse #-}
 
+------------------------------------------------------------------------------
+putProcessingState :: ProcessingState -> Snap ()
+putProcessingState pstate = smodify $ \ss -> ss { _snapProcessingState = pstate }
 
 ------------------------------------------------------------------------------
 -- | Puts a new 'Request' object into the 'Snap' monad.
-putRequest :: Request -> Snap ()
-putRequest r = smodify $ \ss -> ss { _snapRequest = r }
-{-# INLINE putRequest #-}
+-- TODO
+--putRequest :: Request -> Snap ()
+--putRequest r = smodify $ \ss -> ss { _snapRequest = r }
+--{-# INLINE putRequest #-}
 
 
 ------------------------------------------------------------------------------
 -- | Modifies the 'Request' object stored in a 'Snap' monad.
-modifyRequest :: (Request -> Request) -> Snap ()
-modifyRequest f = smodify $ \ss -> ss { _snapRequest = f $ _snapRequest ss }
-{-# INLINE modifyRequest #-}
+--TODO
+--modifyRequest :: (Request -> Request) -> Snap ()
+--modifyRequest f = smodify $ \ss -> ss { _snapRequest = f $ _snapRequest ss }
+--{-# INLINE modifyRequest #-}
 
-
+------------------------------------------------------------------------------
+modifyProcessingState :: ( ProcessingState -> ProcessingState) -> Snap ()
+modifyProcessingState f = smodify $ \ss -> ss { _snapProcessingState = f $ _snapProcessingState ss }
+--{-# INLINE modifyProcessingState #-}
 ------------------------------------------------------------------------------
 -- | Modifes the 'Response' object stored in a 'Snap' monad.
 modifyResponse :: (Response -> Response) -> Snap () 
@@ -413,9 +428,22 @@ writeLazyText s = writeLBS $ LT.encodeUtf8 s
 -- be read using @mmap()@.
 sendFile :: FilePath -> Snap ()
 sendFile f = modifyResponse $ \r -> r { rspBody = SendFile f }
-
-
 ------------------------------------------------------------------------------
+localProcessing :: (ProcessingState -> ProcessingState) -> Snap a -> Snap a
+localProcessing f m = do
+    pstate <- getProcessingState
+
+    runAct pstate <|> (putProcessingState pstate >> pass)
+    
+  where
+    runAct pstate = do
+        modifyProcessingState f
+        result <- m
+        putProcessingState pstate
+        return result   
+{-# INLINE localProcessing #-}
+------------------------------------------------------------------------------
+{-
 -- | Runs a 'Snap' action with a locally-modified 'Request' state
 -- object. The 'Request' object in the Snap monad state after the call
 -- to localRequest will be unchanged.
@@ -433,7 +461,7 @@ localRequest f m = do
         return result
 {-# INLINE localRequest #-}
 
-
+-}
 ------------------------------------------------------------------------------
 -- | Fetches the 'Request' from state and hands it to the given action.
 withRequest :: (Request -> Snap a) -> Snap a
@@ -468,9 +496,10 @@ instance Exception NoHandlerException
 runSnap :: Snap a
         -> (ByteString -> IO ())
         -> Request
+        -> ProcessingState
         -> Iteratee IO (Request,Response)
-runSnap (Snap m) logerr req = do
-    (r, ss') <- runStateT m ss
+runSnap (Snap m) logerr req pstate = do
+    (r, ss') <-runStateT (runReaderT m req) ss
 
     e <- maybe (return $ Left fourohfour)
                return
@@ -481,7 +510,7 @@ runSnap (Snap m) logerr req = do
                  Left x  -> x
                  Right _ -> _snapResponse ss'
 
-    return (_snapRequest ss', resp)
+    return (req, resp)
 
   where
     fourohfour = setContentLength 3 $
@@ -491,7 +520,7 @@ runSnap (Snap m) logerr req = do
 
     dresp = emptyResponse { rspHttpVersion = rqVersion req }
 
-    ss = SnapState req dresp logerr
+    ss = SnapState pstate dresp logerr
 {-# INLINE runSnap #-}
 
 
@@ -499,9 +528,10 @@ runSnap (Snap m) logerr req = do
 evalSnap :: Snap a
          -> (ByteString -> IO ())
          -> Request
+         -> ProcessingState
          -> Iteratee IO a
-evalSnap (Snap m) logerr req = do
-    (r, _) <- runStateT m ss
+evalSnap (Snap m) logerr req pstate = do
+    (r, _) <-runStateT (runReaderT m req) ss
 
     e <- maybe (liftIO $ throwIO NoHandlerException)
                return
@@ -513,7 +543,7 @@ evalSnap (Snap m) logerr req = do
       Right x -> return x
   where
     dresp = emptyResponse { rspHttpVersion = rqVersion req }
-    ss = SnapState req dresp logerr
+    ss = SnapState pstate dresp logerr
 {-# INLINE evalSnap #-}
 
 
