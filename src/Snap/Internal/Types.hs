@@ -242,13 +242,13 @@ method m action = do
 -- Appends n bytes of the path info to the context path with a
 -- trailing slash.
 updateContextPath :: Int -> ProcessingState -> ProcessingState
-updateContextPath n pstate | n > 0     = pstate { rqContextPath = ctx
-                                                , rqPathInfo    = pinfo }
+updateContextPath n pstate | n > 0     = pstate { psContextPath = ctx
+                                                , psPathInfo    = pinfo }
                         | otherwise = pstate
   where
-    ctx'  = S.take n (rqPathInfo pstate)
-    ctx   = S.concat [rqContextPath pstate, ctx', "/"]
-    pinfo = S.drop (n+1) (rqPathInfo pstate)
+    ctx'  = S.take n (psPathInfo pstate)
+    ctx   = S.concat [psContextPath pstate, ctx', "/"]
+    pinfo = S.drop (n+1) (psPathInfo pstate)
 ------------------------------------------------------------------------------
 -- Runs a 'Snap' monad action only if the 'rqPathInfo' matches the given
 -- predicate.
@@ -258,7 +258,7 @@ pathWith :: (ByteString -> ByteString -> Bool)
          -> Snap a
 pathWith c p action = do
     pstate <- getProcessingState
-    unless (c p (rqPathInfo pstate)) pass
+    unless (c p (psPathInfo pstate)) pass
     localProcessing (updateContextPath $ S.length p) action
 
 

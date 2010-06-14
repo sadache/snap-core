@@ -173,15 +173,16 @@ data ProcessingState = ProcessingState
       -- this is called the \"context path\". If a handler is hung on the
       -- context path @\"\/foo\/\"@, and you request @\"\/foo\/bar\"@, the value
       -- of 'rqPathInfo' will be @\"bar\"@.
-     rqPathInfo       :: !ByteString
+     psPathInfo       :: !ByteString
 
       -- | The \"context path\" of the request; catenating 'rqContextPath', and
       -- 'rqPathInfo' should get you back to the original 'rqURI'. The
       -- 'rqContextPath' always begins and ends with a slash (@\"\/\"@)
       -- character, and represents the path (relative to your
       -- component\/snaplet) you took to get to your handler.
-    , rqContextPath    :: !ByteString
-
+    , psContextPath    :: !ByteString
+      -- | TODO some documentation here
+    , psCollectedPathParams :: Params
     
     }
      

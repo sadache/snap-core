@@ -25,12 +25,11 @@ module Snap.Types
 
     -- ** Access to state
   , getRequest
+  , getProcessingState
   , getResponse
-  , putRequest
   , putResponse
-  , modifyRequest
   , modifyResponse
-  , localRequest
+  , localProcessing
   , withRequest
   , withResponse
 
@@ -70,8 +69,8 @@ module Snap.Types
   , rqMethod
   , rqVersion
   , rqCookies
-  , rqPathInfo
-  , rqContextPath
+  , psPathInfo
+  , psContextPath
   , rqURI
   , rqQueryString
   , rqParams

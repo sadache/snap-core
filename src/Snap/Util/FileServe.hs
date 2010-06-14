@@ -159,8 +159,8 @@ defaultMimeTypes = Map.fromList [
 -- and has no ".." elements to escape the intended directory structure.
 getSafePath :: Snap FilePath
 getSafePath = do
-    req <- getRequest
-    let p = S.unpack $ rqPathInfo req
+    pstate <- getProcessingState
+    let p = S.unpack $ psPathInfo pstate
 
     -- check that we don't have any sneaky .. paths
     let dirs = splitDirectories p
