@@ -52,8 +52,8 @@ mkRequest :: ByteString -> IO Request
 mkRequest uri = do
     enum <- newIORef $ SomeEnumerator return
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False Map.empty
-                     enum Nothing GET (1,1) [] "" uri "/"
-                     (B.concat ["/",uri]) "" Map.empty
+                     enum Nothing GET (1,1) [] ""  
+                     (B.concat ["/",uri]) "" uri Map.empty
 
 fs :: Snap ()
 fs = fileServe "data/fileServe"

@@ -28,7 +28,7 @@ mkRq :: IO Request
 mkRq = do
     enum <- newIORef (SomeEnumerator return)
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False Map.empty
-                 enum Nothing GET (1,1) [] "" "/" "/" "/" "" Map.empty
+                 enum Nothing GET (1,1) [] "" "/" "" "/" Map.empty
 
 
 testTypes :: Test

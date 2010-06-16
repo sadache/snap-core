@@ -413,7 +413,11 @@ rqParam :: ByteString           -- ^ parameter name to look up
         -> Maybe [ByteString]
 rqParam k rq = Map.lookup k $ rqParams rq
 {-# INLINE rqParam #-}
-
+------------------------------------------------------------------------------
+pathParam       :: ByteString
+                -> ProcessingState
+                -> Maybe [ByteString]
+pathParam k ps  =  Map.lookup k $ psCollectedPathParams ps  
 
 ------------------------------------------------------------------------------
 -- | Modifies the parameters mapping (which is a @Map ByteString ByteString@) in

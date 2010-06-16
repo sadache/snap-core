@@ -66,13 +66,15 @@ mkRequest uri = do
     enum <- newIORef $ SomeEnumerator return
 
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False Map.empty
-                     enum Nothing GET (1,1) [] "" uri "/"
-                     (B.concat ["/",uri]) "" Map.empty
+                     enum Nothing GET (1,1) [] "" (B.concat ["/",uri])
+                     "" uri Map.empty
+
+
 
 go :: Snap a -> ByteString -> IO a
 go m s = do
     req <- mkRequest s
-    run $ evalSnap m (const $ return ()) req
+    run $ evalSnap m (const $ return ()) req 
 
 
 routes :: Snap ByteString
@@ -122,16 +124,16 @@ topTop, topFoo, fooBar, fooCapture, fooBarBaz, bar, barQuux :: Snap ByteString
 dblA, zabc, topCapture, fooCapture2 :: Snap ByteString
 
 dblA = do
-    ma <- getParam "a"
+    ma <- getPathParam "a"
 
     unless (ma == Just "a a") pass
     return "ok"
 
 
 zabc = do
-    ma <- getParam "a"
-    mb <- getParam "b"
-    mc <- getParam "c"
+    ma <- getPathParam "a"
+    mb <- getPathParam "b"
+    mc <- getPathParam "c"
 
     unless (   ma == Just "a"
             && mb == Just "b"
@@ -141,15 +143,15 @@ zabc = do
 
 
 topCapture = do
-    mp <- getParam "foo"
+    mp <- getPathParam "foo"
     maybe pass return mp
 
 topTop = return "topTop"
 topFoo = return "topFoo"
 fooBar = return "fooBar"
-fooCapture = liftM (head . fromJust . rqParam "id") getRequest
-fooCapture2 = liftM (head . fromJust . rqParam "id2") getRequest
-fooBarBaz = liftM rqPathInfo getRequest
+fooCapture = liftM (head . fromJust . pathParam "id") getProcessingState
+fooCapture2 = liftM (head . fromJust . pathParam "id2") getProcessingState
+fooBarBaz = liftM psPathInfo getProcessingState
 barQuux = return "barQuux"
 bar     = return "bar"
 

@@ -12,6 +12,7 @@ import           Control.Monad.CatchIO
 import           Control.Monad.State.Strict
 import           Control.Monad.Reader
 import           Data.ByteString.Char8 (ByteString)
+import qualified Data.Map as Map
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
 import           Data.IORef
@@ -490,15 +491,17 @@ instance Show NoHandlerException where
 ------------------------------------------------------------------------------
 instance Exception NoHandlerException
 
+------------------------------------------------------------------------------
+initProcessingState :: Request -> ProcessingState
+initProcessingState req = ProcessingState (rqPath req) "/" Map.empty  
 
 ------------------------------------------------------------------------------
 -- | Runs a 'Snap' monad action in the 'Iteratee IO' monad.
 runSnap :: Snap a
         -> (ByteString -> IO ())
         -> Request
-        -> ProcessingState
         -> Iteratee IO (Request,Response)
-runSnap (Snap m) logerr req pstate = do
+runSnap (Snap m) logerr req = do
     (r, ss') <-runStateT (runReaderT m req) ss
 
     e <- maybe (return $ Left fourohfour)
@@ -513,6 +516,7 @@ runSnap (Snap m) logerr req pstate = do
     return (req, resp)
 
   where
+    pstate= initProcessingState req
     fourohfour = setContentLength 3 $
                  setResponseStatus 404 "Not Found" $
                  modifyResponseBody (>. enumBS "404") $
@@ -528,9 +532,8 @@ runSnap (Snap m) logerr req pstate = do
 evalSnap :: Snap a
          -> (ByteString -> IO ())
          -> Request
-         -> ProcessingState
          -> Iteratee IO a
-evalSnap (Snap m) logerr req pstate = do
+evalSnap (Snap m) logerr req = do
     (r, _) <-runStateT (runReaderT m req) ss
 
     e <- maybe (liftIO $ throwIO NoHandlerException)
@@ -542,6 +545,7 @@ evalSnap (Snap m) logerr req pstate = do
       Left _  -> liftIO $ throwIO $ ErrorCall "no value"
       Right x -> return x
   where
+    pstate = initProcessingState req
     dresp = emptyResponse { rspHttpVersion = rqVersion req }
     ss = SnapState pstate dresp logerr
 {-# INLINE evalSnap #-}
@@ -560,5 +564,10 @@ getParam :: ByteString          -- ^ parameter name to look up
 getParam k = do
     rq <- getRequest
     return $ liftM (S.intercalate " ") $ rqParam k rq
-
+------------------------------------------------------------------------------
+getPathParam :: ByteString
+             -> Snap (Maybe ByteString)
+getPathParam k = do
+    pstate <- getProcessingState
+    return $ liftM (S.intercalate " ") $ pathParam k pstate
 

@@ -63,7 +63,7 @@ mkGzipRq = do
     enum <- newIORef $ SomeEnumerator return
 
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False gzipHdrs
-                 enum Nothing GET (1,1) [] "" "/" "/" "/" "" Map.empty
+                 enum Nothing GET (1,1) [] "" "/" "" "/" Map.empty
 
 
 ------------------------------------------------------------------------------
@@ -72,7 +72,7 @@ mkCompressRq = do
     enum <- newIORef $ SomeEnumerator return
 
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False compressHdrs
-                 enum Nothing GET (1,1) [] "" "/" "/" "/" "" Map.empty
+                 enum Nothing GET (1,1) [] "" "/" "" "/" Map.empty
 
 
 ------------------------------------------------------------------------------
@@ -81,7 +81,7 @@ mkBadRq = do
     enum <- newIORef $ SomeEnumerator return
 
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False badHdrs
-                  enum Nothing GET (1,1) [] "" "/" "/" "/" "" Map.empty
+                  enum Nothing GET (1,1) [] "" "/" "" "/" Map.empty
 
 ------------------------------------------------------------------------------
 goGZip, goCompress, goBad :: Snap a -> IO (Request,Response)

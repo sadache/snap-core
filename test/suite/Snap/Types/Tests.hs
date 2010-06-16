@@ -57,8 +57,8 @@ mkRequest uri = do
     enum <- newIORef $ SomeEnumerator return
 
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False Map.empty
-                     enum Nothing GET (1,1) [] "" uri "/"
-                     (S.concat ["/",uri]) "" Map.empty
+                     enum Nothing GET (1,1) [] "" (S.concat ["/",uri]) 
+                      "" uri Map.empty
 
 mkRequestQuery :: ByteString -> ByteString -> [ByteString] -> IO Request
 mkRequestQuery uri k v = do
@@ -68,8 +68,8 @@ mkRequestQuery uri k v = do
     let q  = S.concat [k,"=", S.concat v]
 
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False Map.empty
-                     enum Nothing GET (1,1) [] "" uri "/"
-                     (S.concat ["/",uri,"?",q]) q mp
+                     enum Nothing GET (1,1) [] "" (S.concat ["/",uri,"?",q]) 
+                      q  uri mp
 
 
 mkZomgRq :: IO Request
@@ -77,14 +77,14 @@ mkZomgRq = do
     enum <- newIORef $ SomeEnumerator return
 
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False Map.empty
-                     enum Nothing GET (1,1) [] "" "/" "/" "/" "" Map.empty
+                     enum Nothing GET (1,1) [] "" "/" "" "/" Map.empty
 
 
 mkRqWithBody :: IO Request
 mkRqWithBody = do
     enum <- newIORef $ SomeEnumerator (enumBS "zazzle")
     return $ Request "foo" 80 "foo" 999 "foo" 1000 "foo" False Map.empty
-                 enum Nothing GET (1,1) [] "" "/" "/" "/" ""
+                 enum Nothing GET (1,1) [] "" "/" "" "/"
                  Map.empty
 
 
@@ -191,20 +191,24 @@ testRqBody = testCase "request bodies" $ do
 testTrivials :: Test
 testTrivials = testCase "trivial functions" $ do
     (rq,rsp) <- go $ do
-        req <- getRequest
-        putRequest $ req { rqIsSecure=True }
+        pstate <- getProcessingState
+        putProcessingState $ pstate { psContextPath="/foo/" }
+        ps <- getProcessingState
+        liftIO $ assertEqual "processing status" "/foo/" $ psContextPath ps
         putResponse $ setResponseStatus 333 "333" sampleResponse
         r <- getResponse
         liftIO $ assertEqual "rsp status" 333 $ rspStatus r
-        !_ <- localRequest (\x -> x {rqIsSecure=False}) $ do
-            q <- getRequest
-            liftIO $ assertEqual "localrq" False $ rqIsSecure q
+
+        !_ <- localProcessing (\x -> x {psContextPath="/foo/bar/"}) $ do
+            q <- getProcessingState
+            liftIO $ assertEqual "local processing" "/foo/bar/" $ psContextPath q
             return ()
+        ps' <- getProcessingState
+        liftIO $ assertEqual "processing status" "/foo/" $ psContextPath ps'
         return ()
 
     let !_ = show NoHandlerException `seq` ()
 
-    assertEqual "rq secure" True $ rqIsSecure rq
     assertEqual "rsp status" 333 $ rspStatus rsp
 
 
